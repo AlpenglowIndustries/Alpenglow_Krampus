@@ -55,7 +55,8 @@ Defaults on reset:
 #include <avr/interrupt.h>
 #include <stdint.h>
 
-#define MAXBRITE  75
+#define MAXEYES  255
+#define MAXTONGUE 150
 #define MINBRITE  5   // minimum PWM resolution is technically 3, but it hangs if lower
 
 volatile uint32_t counter;
@@ -85,8 +86,8 @@ void checkMode(void) {
 
   // if mode is solid (1), keeps LEDs on and checks mode every second
   while (mode) {
-    OCR0A = MAXBRITE;
-    OCR0B = MAXBRITE;
+    OCR0A = MAXEYES;
+    OCR0B = MAXTONGUE;
     delay(1000);
     mode = PINB & (1 << PINB2);
   }
@@ -119,7 +120,7 @@ int main(void) {
 
   uint8_t wait = 20;
   int8_t change = 1;
-  OCR0B = MAXBRITE;             // set tongue to solid on for testing
+  OCR0B = MAXTONGUE;             // set tongue to solid on for testing
   uint8_t brightness = MINBRITE+1;
 
   while (1) {
@@ -137,7 +138,7 @@ int main(void) {
     // }
 
     // cycles through pulsing up and down on eyes, speed determined by wait
-    if (brightness == MINBRITE || brightness == MAXBRITE) {
+    if (brightness == MINBRITE || brightness == MAXEYES) {
       change = -change;
     }
 
