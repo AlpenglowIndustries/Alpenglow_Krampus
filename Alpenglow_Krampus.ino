@@ -60,6 +60,10 @@ Defaults on reset:
 #define MINBRITE  5   // minimum PWM resolution is technically 3, but it hangs if lower
 
 volatile uint32_t counter;
+uint8_t times[] = {17, 50, 33};
+uint8_t repeats[] = {6, 2, 4};
+uint8_t loops = 0;
+uint8_t mode = 0;
 
 // PB0 = eyes
 // PB1 = tongue
@@ -70,41 +74,25 @@ volatile uint32_t counter;
 // 1 mode
 // 1 wait
 // 1 change
+// 1 eyeBright
+// 1 loops
 // 1 loop counter
 // ===============
-// 8 bytes RAM max
+// 10 bytes RAM max
 
 void delay(uint16_t time) {  // brute force semi-accurate delay routine that doesn't use a timer
-
   counter = 46 * time;
   do counter--; while (counter != 0);
 }
-
-void checkMode(void) {
-  uint8_t mode = 0;
-  mode = PINB & (1 << PINB2);   // reads input on PB2
-
-  // if mode is solid (1), keeps LEDs on and checks mode every second
-  while (mode) {
-    OCR0A = MAXEYES;
-    OCR0B = MAXTONGUE;
-    delay(1000);
-    mode = PINB & (1 << PINB2);
-  }
-
-  PORTB &= ~(1 << PB0 || 1 << PB1);  // turns all LEDs off when exiting solid on mode
-}
-
 
 int main(void) {
                                                       // all pins set to inputs by default
   DDRB = (1 << DDB0 | 1 << DDB1);                     // PB0, PB1 set to outputs (eyes, tongue)
   PORTB = (1 << PORTB2);                              // Pullup resistor enabled on input pin PB2
-  //sei();                                              // all interrupts enabled
 
-  TCCR0A = (1 << COM0A1 | 1 << COM0B1 | 1 << WGM00);  // Phase-correct PWM 8-bit mode, A and B
-  TCCR0B = (1 << CS01);                               // clk/8, timer started, 125 kHz timer clock
-                                                      // and 245 Hz PWM frequency
+  // TCCR0A = (1 << COM0A1 | 1 << COM0B1 | 1 << WGM00);  // Phase-correct PWM 8-bit mode, A and B
+  // TCCR0B = (1 << CS01);                               // clk/8, timer started, 125 kHz timer clock
+  //                                                     // and 245 Hz PWM frequency
 
   /*
   The General Gist:
@@ -118,41 +106,39 @@ int main(void) {
     the transistor-driven LEDs have "normal" logic (high means LED is ON).
   */
 
-  uint8_t wait = 20;
-  int8_t change = 1;
-  OCR0B = MAXTONGUE;             // set tongue to solid on for testing
-  uint8_t brightness = MINBRITE+1;
+  //uint8_t wait = 20;
+  //int8_t change = 1;
+  //uint8_t eyeBright = MINBRITE + 1;
+
+
 
   while (1) {
-    //checkMode();              // polls switch for either solid on or pulsing behavior
 
-    // uint8_t i;
-    // for (i = MINBRITE; i < MAXBRITE + 1; i++) {
-    //   OCR0A = i;
-    //   delay(wait);
-    // }
-
-    // for (i = MAXBRITE; i > MINBRITE - 1; i--) {
-    //   OCR0A = i;
-    //   delay(wait);
-    // }
-
-    // cycles through pulsing up and down on eyes, speed determined by wait
-    if (brightness == MINBRITE || brightness == MAXEYES) {
-      change = -change;
+    mode = PINB & (1 << PINB2);   // reads input on PB2
+    while (mode) {
+      // flickers
+      uint8_t i;
+      for (i = 0; i < repeats[loops]; i++) {
+        PINB |= (1 << PB0) | (1 << PB1);
+        delay(times[loops]*10);
+      }
+      loops = (loops + 1) % 5;
+      mode = PINB & (1 << PINB2);
     }
 
-    OCR0A = brightness;
-    brightness += change;
-    delay(wait);
+    PORTB &= ~( (1 << PB0) | (1<< PB1)); // turns outputs off
 
-    // old pulsing code from RBG
-    // uint8_t j;
-    // for (j = 0; j < MAXBRITE - MINBRITE; j++){
-    //   OCR0A = MAXBRITE - j;     // red (blue)    ON to OFF
-    //   OCR0B = j + MINBRITE;     // green (blue)  OFF to ON
-    //   delay(60);
+
+
+    // // cycles through pulsing up and down on eyes & tongue, speed determined by wait
+    // if (eyeBright == MINBRITE || eyeBright == MAXEYES) {
+    //   change = -change;
     // }
+
+    // OCR0A = eyeBright;
+    // OCR0B = eyeBright;
+    // eyeBright += change;
+    // delay(wait);
 
   }   // end while(1)
 }     // end main
