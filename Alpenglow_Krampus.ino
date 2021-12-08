@@ -55,15 +55,18 @@ Defaults on reset:
 //#include <avr/interrupt.h>
 #include <stdint.h>
 
-#define MAXEYES  255
-#define MAXTONGUE 150
+#define MAXBRITE  255
 #define MINBRITE  5   // minimum PWM resolution is technically 3, but it hangs if lower
+#define WAIT      10
 
 volatile uint32_t counter;
-uint8_t times[] = {17, 50, 33};
-uint8_t repeats[] = {5, 2, 4};
+uint8_t times[] = {17, 50, 25, 17, 50};   // flicker time, divided by 5
+uint8_t repeats[] = {3, 2, 6, 2, 2};      // number of times each of the above flicker times repeats
+uint8_t length = 5;                       // length of the above arrays
 uint8_t pos = 0;
 uint8_t mode = 0;
+int8_t change = 1;
+uint8_t brightness = MINBRITE + 1;
 
 // PB0 = eyes
 // PB1 = tongue
@@ -74,7 +77,7 @@ uint8_t mode = 0;
 // 1 mode
 // 1 wait
 // 1 change
-// 1 eyeBright
+// 1 brightness
 // 1 pos
 // 1 loop counter
 // ===============
@@ -90,10 +93,9 @@ int main(void) {
   DDRB = (1 << DDB0 | 1 << DDB1);                     // PB0, PB1 set to outputs (eyes, tongue)    
   PUEB = (1 << PUEB2);                                // Pullup resistor enabled on input pin PB2
   PORTB |= (1 << PORTB0);
-
-  // TCCR0A = (1 << COM0A1 | 1 << COM0B1 | 1 << WGM00);  // Phase-correct PWM 8-bit mode, A and B
-  // TCCR0B = (1 << CS01);                               // clk/8, timer started, 125 kHz timer clock
-  //                                                     // and 245 Hz PWM frequency
+                                                      // PWM setup, for 125 kHz timer cloc and 245 Hz PWM frequency
+  TCCR0A = (1 << COM0A1 | 1 << COM0B1 | 1 << WGM00);  // Phase-correct PWM 8-bit mode, A and B    
+  TCCR0B = (1 << CS01);                             // clk/8, timer started                                          
 
   /*
   The General Gist:
@@ -107,39 +109,48 @@ int main(void) {
     the transistor-driven LEDs have "normal" logic (high means LED is ON).
   */
 
-  //uint8_t wait = 20;
-  //int8_t change = 1;
-  //uint8_t eyeBright = MINBRITE + 1;
-
-
-
   while (1) {
 
     mode = PINB & (1 << PINB2);   // reads input on PB2
-    while (mode) {
-      // flickers
-      uint8_t i;
-      for (i = 0; i < repeats[pos]; i++) {
-        PINB |= (1 << PINB0) | (1 << PINB1);
-        delay(5*times[pos]);
+
+    // Flicker behavior
+    if (mode) {
+      TCCR0A = 0;                 // PWM/timer operations stopped
+      TCCR0B = 0;                 
+      PORTB = 1;                  // turns tongue off and eyes on so they alternate
+      while (mode) {
+        // flickers
+        uint8_t i;
+        for (i = 0; i < repeats[pos]; i++) {
+          PINB |= (1 << PINB0) | (1 << PINB1);   // shortcut for toggling pin output
+          delay(5*times[pos]);
+        }
+        pos = (pos + 1) % length;
+        mode = PINB & (1 << PINB2);
       }
-      pos = (pos + 1) % 3;
+      PORTB = 0;                                 // eyes and tongue off
+    }
+
+    // Pulse behavior
+    // cycles through pulsing up and down on eyes & tongue, speed determined by wait
+                                                        // PWM setup, for 125 kHz timer cloc and 245 Hz PWM frequency
+    TCCR0A = (1 << COM0A1 | 1 << COM0B1 | 1 << WGM00);  // Phase-correct PWM 8-bit mode, A and B  
+    TCCR0B = (1 << CS01);                               // clk/8, timer started
+    brightness = MINBRITE + 1;
+    while (!mode) {
+      if (brightness == MINBRITE || brightness == MAXBRITE) {
+        change = -change;
+      }
+
+      OCR0A = brightness;
+      OCR0B = brightness;
+      brightness += change;
+      delay(WAIT);  
       mode = PINB & (1 << PINB2);
     }
 
-    PORTB |= (1 << PORTB0) | (1<< PORTB1); // turns outputs on
 
-
-
-    // // cycles through pulsing up and down on eyes & tongue, speed determined by wait
-    // if (eyeBright == MINBRITE || eyeBright == MAXEYES) {
-    //   change = -change;
-    // }
-
-    // OCR0A = eyeBright;
-    // OCR0B = eyeBright;
-    // eyeBright += change;
-    // delay(wait);
+//    PORTB |= (1 << PORTB0) | (1<< PORTB1);            // turns eyes and tongue solid on for photo mode, comment out above pulse
 
   }   // end while(1)
 }     // end main
