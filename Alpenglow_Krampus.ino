@@ -52,7 +52,7 @@ Defaults on reset:
 
 //#include <util/atomic.h>
 #include <avr/io.h>
-#include <avr/interrupt.h>
+//#include <avr/interrupt.h>
 #include <stdint.h>
 
 #define MAXEYES  255
@@ -61,8 +61,8 @@ Defaults on reset:
 
 volatile uint32_t counter;
 uint8_t times[] = {17, 50, 33};
-uint8_t repeats[] = {6, 2, 4};
-uint8_t loops = 0;
+uint8_t repeats[] = {5, 2, 4};
+uint8_t pos = 0;
 uint8_t mode = 0;
 
 // PB0 = eyes
@@ -75,7 +75,7 @@ uint8_t mode = 0;
 // 1 wait
 // 1 change
 // 1 eyeBright
-// 1 loops
+// 1 pos
 // 1 loop counter
 // ===============
 // 10 bytes RAM max
@@ -87,8 +87,9 @@ void delay(uint16_t time) {  // brute force semi-accurate delay routine that doe
 
 int main(void) {
                                                       // all pins set to inputs by default
-  DDRB = (1 << DDB0 | 1 << DDB1);                     // PB0, PB1 set to outputs (eyes, tongue)
-  PORTB = (1 << PORTB2);                              // Pullup resistor enabled on input pin PB2
+  DDRB = (1 << DDB0 | 1 << DDB1);                     // PB0, PB1 set to outputs (eyes, tongue)    
+  PUEB = (1 << PUEB2);                                // Pullup resistor enabled on input pin PB2
+  PORTB |= (1 << PORTB0);
 
   // TCCR0A = (1 << COM0A1 | 1 << COM0B1 | 1 << WGM00);  // Phase-correct PWM 8-bit mode, A and B
   // TCCR0B = (1 << CS01);                               // clk/8, timer started, 125 kHz timer clock
@@ -118,15 +119,15 @@ int main(void) {
     while (mode) {
       // flickers
       uint8_t i;
-      for (i = 0; i < repeats[loops]; i++) {
-        PINB |= (1 << PB0) | (1 << PB1);
-        delay(times[loops]*10);
+      for (i = 0; i < repeats[pos]; i++) {
+        PINB |= (1 << PINB0) | (1 << PINB1);
+        delay(5*times[pos]);
       }
-      loops = (loops + 1) % 5;
+      pos = (pos + 1) % 3;
       mode = PINB & (1 << PINB2);
     }
 
-    PORTB &= ~( (1 << PB0) | (1<< PB1)); // turns outputs off
+    PORTB |= (1 << PORTB0) | (1<< PORTB1); // turns outputs on
 
 
 
